@@ -1,8 +1,8 @@
 // logic.js – 판단 규칙만 담는 파일
 // 화면(document, 버튼, 표 등)을 다루는 코드는 넣지 않습니다. 화면은 app.js 담당입니다.
 
-// PRD 4장: 지역은 이 4곳 중에서만 고릅니다
-const REGIONS = ["세종", "대전", "태안", "보령"];
+// PRD 4장: 지역은 이 5곳 중에서만 고릅니다
+const REGIONS = ["세종", "대전", "태안", "보령", "서산"];
 
 // PRD 4장: 구분은 이 3가지 중에서만 고릅니다
 const KINDS = ["야외", "고소", "실내"];
@@ -55,6 +55,7 @@ const REGION_COORDS = {
   대전: { lat: 36.35, lon: 127.38 },
   태안: { lat: 36.75, lon: 126.30 },
   보령: { lat: 36.33, lon: 126.61 },
+  서산: { lat: 36.78, lon: 126.45 },
 };
 
 // PRD 5장 업무 규칙의 기준값 (교육용 가상 기준)
@@ -124,7 +125,7 @@ function applyTestMode(weather, mode) {
 const DEPLOYED_SITE = "https://aicamp-mu.vercel.app";
 
 // 충청남도 소속 지역. 특보 글에 "충청남도"만 있고 세부 지역이 없으면 충남 전체 특보입니다.
-const CHUNGNAM_REGIONS = ["태안", "보령"];
+const CHUNGNAM_REGIONS = ["태안", "보령", "서산"];
 
 // 특보 서버 함수 주소를 정합니다.
 // Vercel 에서 열었으면 같은 사이트의 /api/warnings, 그 밖(file:// · localhost)이면 배포 주소를 씁니다.
@@ -140,7 +141,7 @@ function isRegionInAreas(region, areas) {
   // "태안 제외" 처럼 제외된 경우는 빼고 찾습니다
   const named = new RegExp(`${region}(?!\\s*제외)`).test(areas);
   if (named) return true;
-  // "충청남도" 뒤에 괄호가 없으면 충남 전체 특보 → 태안 · 보령 해당
+  // "충청남도" 뒤에 괄호가 없으면 충남 전체 특보 → 태안 · 보령 · 서산 해당
   return CHUNGNAM_REGIONS.includes(region) && /충청남도(?!\s*\()/.test(areas);
 }
 

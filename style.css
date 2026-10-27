@@ -11,7 +11,7 @@ body {
 
 /* ===== 가운데 카드 ===== */
 .board {
-  max-width: 820px;                  /* 너무 넓어지지 않게 최대 폭 제한 */
+  max-width: 1000px;                 /* 너무 넓어지지 않게 최대 폭 제한 */
   margin: 0 auto;                    /* 가로 가운데 정렬 */
   padding: 40px 48px;
   background: #ffffff;
@@ -70,7 +70,7 @@ body {
 /* ===== F-04 날씨 상태 안내 ===== */
 .weather-status {
   min-height: 1.2em;                 /* 비어 있어도 자리를 지켜 표가 들썩이지 않게 */
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   font-size: 0.9rem;
   color: #64748b;
 }
@@ -85,10 +85,25 @@ body {
   white-space: nowrap;
 }
 
+/* 일정 이름 칸은 최소 폭을 지켜 한 글자씩 쪼개지지 않게 */
+.task-table td:first-child {
+  min-width: 10em;
+}
+
 /* 날씨 칸 숫자는 살짝 연한 색 */
 .task-table td:nth-child(5) {
   color: #475569;
 }
+
+/* ===== F-07 특보 칸 ===== */
+.warn {
+  display: block;                    /* 특보가 여러 개면 한 줄에 하나씩 */
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.warn-watch { color: #b45309; }      /* 주의보: 노랑(호박색) */
+.warn-alert { color: #b91c1c; }      /* 경보: 빨강 */
 
 /* ===== F-04 판단 배지 ===== */
 .badge {

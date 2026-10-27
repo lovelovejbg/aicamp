@@ -1,5 +1,5 @@
-// app.js – 화면 동작 (오늘 날짜 표시, 일정 목록 그리기, 일정 추가, 날씨 API 호출)
-// 규칙(REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, judgeTask 등)은
+// app.js – 화면 동작 (오늘 날짜 표시, 일정 목록 그리기, 일정 추가, 날씨 · 특보 API 호출)
+// 규칙(REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, parseWarnings, judgeTask 등)은
 // logic.js 에 있고, index.html 에서 먼저 불러옵니다.
 
 // 브라우저 저장소(localStorage)에 일정을 저장할 때 쓰는 이름표
@@ -82,9 +82,31 @@ function formatWeather(w) {
   return `${w.temp}℃ · ${w.wind}m/s · ${w.rain}%`;
 }
 
+// 특보 칸을 만듭니다. 주의보는 노랑, 경보는 빨강 글자
+// list: 그 지역 특보 목록. 특보를 못 받았으면 null
+function createWarningCell(list) {
+  const cell = document.createElement("td");
+  if (!list) {
+    cell.textContent = "-";
+    return cell;
+  }
+  if (list.length === 0) {
+    cell.textContent = "없음";
+    return cell;
+  }
+  for (const item of list) {
+    const tag = document.createElement("span");
+    tag.className = item.level === "경보" ? "warn warn-alert" : "warn warn-watch";
+    tag.textContent = `${item.type}${item.level}`; // 예: "강풍주의보"
+    cell.appendChild(tag);
+  }
+  return cell;
+}
+
 // 일정 표를 처음부터 다시 그립니다
-// weather: 지역별 날씨 (아직 못 받았거나 실패했으면 null)
-function renderTasks(tasks, weather) {
+// weather : 지역별 날씨 (아직 못 받았거나 실패했으면 null)
+// warnings: 지역별 특보 목록 (아직 못 받았거나 실패했으면 null)
+function renderTasks(tasks, weather, warnings) {
   const tbody = document.getElementById("task-list");
   tbody.replaceChildren(); // 기존 행을 모두 지움
 
@@ -99,8 +121,11 @@ function renderTasks(tasks, weather) {
       row.appendChild(cell);
     }
 
+    // 특보 칸
+    row.appendChild(createWarningCell(warnings ? warnings[task.region] : null));
+
     // 마지막 판단 칸: logic.js 의 규칙으로 판단해 색깔 배지로 표시
-    const judgement = judgeTask(task, weather);
+    const judgement = judgeTask(task, weather, warnings);
     const badge = document.createElement("span");
     badge.className = `badge ${JUDGE_CLASS[judgement]}`;
     badge.textContent = judgement;
@@ -114,19 +139,24 @@ function renderTasks(tasks, weather) {
 
 // ----- F-04 날씨 받기 -----
 
-// 날씨 상태 안내 문구를 바꿉니다. isError 가 true 면 빨간 글씨
-function showWeatherStatus(text, isError) {
-  const status = document.getElementById("weather-status");
+// 주소 끝의 ?test=wind · ?test=warn 같은 시험 모드 값 (없으면 null)
+const testMode = new URLSearchParams(location.search).get("test");
+
+// 안내 문구를 바꿉니다. id 는 안내 자리(weather-status · warning-status), isError 가 true 면 빨간 글씨
+function showStatus(id, text, isError) {
+  const status = document.getElementById(id);
   status.textContent = text;
   status.classList.toggle("is-error", Boolean(isError));
+}
+
+// 날씨 안내 문구
+function showWeatherStatus(text, isError) {
+  showStatus("weather-status", text, isError);
 }
 
 // Open-Meteo 에서 오늘 날씨를 받아 표를 다시 그립니다.
 // 실패해도 목록은 이미 그려져 있으므로 안내만 띄우고 끝냅니다.
 async function loadWeather() {
-  // 주소 끝의 ?test=wind 같은 시험 모드 값을 읽습니다 (없으면 null)
-  const testMode = new URLSearchParams(location.search).get("test");
-
   showWeatherStatus("날씨를 받는 중이에요…", false);
   try {
     const response = await fetch(buildWeatherUrl());
@@ -135,7 +165,7 @@ async function loadWeather() {
 
     const data = await response.json();
     weather = applyTestMode(parseWeather(data), testMode);
-    renderTasks(tasks, weather);
+    renderTasks(tasks, weather, warnings);
 
     if (testMode === "wind") {
       showWeatherStatus(`시험 모드: 모든 지역 풍속을 ${TEST_WIND}m/s 로 바꿔 판단하고 있어요.`, false);
@@ -144,9 +174,47 @@ async function loadWeather() {
     }
   } catch (error) {
     console.warn("날씨를 받지 못했습니다.", error);
-    weather = null;               // 판단을 모두 '날씨 확인 전'으로
-    renderTasks(tasks, weather);
+    weather = null;               // 날씨로는 판단하지 않음 (특보 규칙만 적용)
+    renderTasks(tasks, weather, warnings);
     showWeatherStatus("날씨를 받지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.", true);
+  }
+}
+
+// ----- F-07 기상특보 받기 -----
+
+// 발표시각 202610271600 → "10월 27일 16:00"
+function formatTmFc(tmFc) {
+  const s = String(tmFc ?? "");
+  if (s.length < 12) return "";
+  return `${Number(s.slice(4, 6))}월 ${Number(s.slice(6, 8))}일 ${s.slice(8, 10)}:${s.slice(10, 12)}`;
+}
+
+// 서버 함수(/api/warnings)로 기상청 특보를 받아 표를 다시 그립니다.
+// 실패해도 목록 · 날씨 판단은 그대로 두고, 특보 칸만 '-' 로 남깁니다.
+async function loadWarnings() {
+  showStatus("warning-status", "기상특보를 받는 중이에요…", false);
+  try {
+    const response = await fetch(buildWarningUrl(location.hostname));
+    const data = await response.json();
+    // 서버 함수가 { ok: false, message } 를 보내면 실패로 처리
+    if (!response.ok || !data.ok) throw new Error(data.message || `특보 응답 오류 (${response.status})`);
+
+    warnings = applyWarningTestMode(parseWarnings(data.t6), testMode);
+    renderTasks(tasks, weather, warnings);
+
+    const time = formatTmFc(data.tmFc);
+    if (testMode === "warn") {
+      showStatus("warning-status", "시험 모드: 모든 지역에 강풍주의보를 더해 판단하고 있어요.", false);
+    } else {
+      showStatus("warning-status", time ? `기상청 특보 기준: ${time} 발표` : "기상청 특보: 현재 발효 중인 특보 없음", false);
+    }
+  } catch (error) {
+    console.warn("기상특보를 받지 못했습니다.", error);
+    // ?test=warn 은 특보를 못 받아도 시험할 수 있게 빈 특보에서 시작
+    warnings = testMode === "warn" ? applyWarningTestMode(null, testMode) : null;
+    renderTasks(tasks, weather, warnings);
+    const suffix = testMode === "warn" ? " (시험 모드: 가짜 강풍주의보로 판단 중)" : "";
+    showStatus("warning-status", `기상특보를 받지 못했어요.${suffix}`, true);
   }
 }
 
@@ -158,14 +226,18 @@ let tasks = loadTasks();
 // 받아 온 지역별 날씨 (받기 전이거나 실패하면 null → 판단은 '날씨 확인 전')
 let weather = null;
 
+// 받아 온 지역별 특보 목록 (받기 전이거나 실패하면 null → 특보 칸 '-')
+let warnings = null;
+
 const form = document.getElementById("task-form");
 const message = document.getElementById("form-message");
 
 renderToday();
 fillOptions(form.elements.region, REGIONS);
 fillOptions(form.elements.kind, KINDS);
-renderTasks(tasks, weather); // 날씨 없이 목록부터 먼저 보여 줍니다
-loadWeather();               // 날씨를 받으면 표를 다시 그립니다
+renderTasks(tasks, weather, warnings); // 날씨 · 특보 없이 목록부터 먼저 보여 줍니다
+loadWeather();   // 날씨를 받으면 표를 다시 그립니다
+loadWarnings();  // 특보를 받으면 표를 다시 그립니다 (날씨와 동시에 따로 받음)
 
 // F-02 일정 추가: [추가] 버튼을 누르거나 입력칸에서 Enter 를 누르면 실행됩니다
 form.addEventListener("submit", (event) => {
@@ -186,7 +258,7 @@ form.addEventListener("submit", (event) => {
 
   tasks.push(result.task); // 목록 맨 아래에 추가
   saveTasks(tasks);        // 새로고침해도 남도록 저장
-  renderTasks(tasks, weather); // 표 다시 그리기 (받아 둔 날씨로 새 일정도 바로 판단)
+  renderTasks(tasks, weather, warnings); // 표 다시 그리기 (받아 둔 날씨 · 특보로 새 일정도 바로 판단)
 
   // 다음 입력을 위해 글자 칸만 비우고, 일정 칸에 커서를 둡니다
   message.textContent = "";

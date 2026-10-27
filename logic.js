@@ -108,26 +108,86 @@ function applyTestMode(weather, mode) {
   return changed;
 }
 
-// 일정 하나를 판단합니다 (PRD R-01 ~ R-05).
-// task   : { title, region, kind, owner }
-// weather: 지역별 날씨 객체. 아직 못 받았으면 null
-// 결과   : '영향 없음' · '날씨 확인 전' · '중지 검토' · '폭염 휴식' · '우천 주의' · '진행' 중 하나
+// ===================== F-07 기상특보 =====================
+
+// 배포된 서버 함수 주소. 더블클릭(file://)이나 로컬에서 열 때는 이 주소를 부릅니다.
+const DEPLOYED_SITE = "https://aicamp-mu.vercel.app";
+
+// 충청남도 소속 지역. 특보 글에 "충청남도"만 있고 세부 지역이 없으면 충남 전체 특보입니다.
+const CHUNGNAM_REGIONS = ["태안", "보령"];
+
+// 특보 서버 함수 주소를 정합니다.
+// Vercel 에서 열었으면 같은 사이트의 /api/warnings, 그 밖(file:// · localhost)이면 배포 주소를 씁니다.
+// (화면 코드를 쓰지 않도록 location 대신 hostname 글자만 받습니다)
+function buildWarningUrl(hostname) {
+  if (hostname && hostname.endsWith(".vercel.app")) return "/api/warnings";
+  return `${DEPLOYED_SITE}/api/warnings`;
+}
+
+// 특보 지역 글(areas)에 해당 지역이 들어 있는지 봅니다.
+// 예) "충청남도(태안, 당진, 보령(도서제외))" → 태안 O, 보령 O, 세종 X
+function isRegionInAreas(region, areas) {
+  // "태안 제외" 처럼 제외된 경우는 빼고 찾습니다
+  const named = new RegExp(`${region}(?!\\s*제외)`).test(areas);
+  if (named) return true;
+  // "충청남도" 뒤에 괄호가 없으면 충남 전체 특보 → 태안 · 보령 해당
+  return CHUNGNAM_REGIONS.includes(region) && /충청남도(?!\s*\()/.test(areas);
+}
+
+// 기상청 특보발효현황 글(t6)을 지역별 특보 목록으로 바꿉니다.
+// 입력 예: "o 강풍주의보 : 충청남도(태안, 보령)\r\no 한파주의보 : 대전, 세종"
+// 결과 예: { 세종: [{ type: "한파", level: "주의보" }], 대전: [...], 태안: [{ type: "강풍", level: "주의보" }], 보령: [...] }
+function parseWarnings(t6) {
+  const warnings = {};
+  for (const region of REGIONS) warnings[region] = [];
+
+  // 한 줄에 특보 하나씩: "o {종류}{주의보|경보} : {지역들}"
+  for (const line of String(t6 ?? "").split(/\r?\n/)) {
+    const match = line.match(/^\s*o\s*(\S+?)(주의보|경보)\s*:\s*(.+)$/);
+    if (!match) continue;
+    const [, type, level, areas] = match;
+    for (const region of REGIONS) {
+      if (isRegionInAreas(region, areas)) warnings[region].push({ type, level });
+    }
+  }
+  return warnings;
+}
+
+// 특보 시험 모드: mode 가 "warn" 이면 모든 지역에 강풍주의보를 더한 복사본을 돌려줍니다.
+// 특보를 못 받았어도(null) 시험할 수 있게 빈 목록에서 시작합니다.
+function applyWarningTestMode(warnings, mode) {
+  if (mode !== "warn") return warnings;
+  const changed = {};
+  for (const region of REGIONS) {
+    const list = (warnings && warnings[region]) || [];
+    changed[region] = [...list, { type: "강풍", level: "주의보" }];
+  }
+  return changed;
+}
+
+// 일정 하나를 판단합니다 (PRD R-01 ~ R-06).
+// task    : { title, region, kind, owner }
+// weather : 지역별 날씨 객체. 아직 못 받았으면 null
+// warnings: 지역별 특보 목록. 아직 못 받았으면 null (생략 가능)
+// 결과    : '영향 없음' · '날씨 확인 전' · '중지 검토' · '폭염 휴식' · '우천 주의' · '진행' 중 하나
 // 여러 규칙에 걸리면 R-02 → R-03 → R-04 순서로 먼저 걸린 하나만 돌려줍니다 (R-05).
-function judgeTask(task, weather) {
+function judgeTask(task, weather, warnings) {
   // R-01 실내는 날씨와 관계없이 영향 없음 (날씨를 못 받았어도 마찬가지)
   if (task.kind === "실내") return "영향 없음";
 
-  // R-05 날씨를 아직 못 받았으면 판단 보류
   const w = weather && weather[task.region];
+  const list = (warnings && warnings[task.region]) || [];
+  // R-06 해당 지역에 이 종류의 특보(주의보 · 경보)가 있는지
+  const hasWarning = (type) => list.some((item) => item.type === type);
+
+  // R-02 높은 곳 작업 + (풍속 10 m/s 이상 또는 강풍특보)
+  if (task.kind === "고소" && ((w && w.wind >= WIND_STOP) || hasWarning("강풍"))) return "중지 검토";
+  // R-03 최고 기온 33℃ 이상 또는 폭염특보
+  if ((w && w.temp >= HEAT_REST) || hasWarning("폭염")) return "폭염 휴식";
+  // R-04 강수확률 60% 이상 또는 호우특보
+  if ((w && w.rain >= RAIN_WARN) || hasWarning("호우")) return "우천 주의";
+
+  // R-05 날씨를 아직 못 받았으면 판단 보류, 받았는데 어느 규칙에도 안 걸리면 진행
   if (!w) return "날씨 확인 전";
-
-  // R-02 높은 곳 작업 + 강풍
-  if (task.kind === "고소" && w.wind >= WIND_STOP) return "중지 검토";
-  // R-03 폭염
-  if (w.temp >= HEAT_REST) return "폭염 휴식";
-  // R-04 비
-  if (w.rain >= RAIN_WARN) return "우천 주의";
-
-  // R-05 어느 규칙에도 안 걸림
   return "진행";
 }

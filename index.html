@@ -24,6 +24,8 @@
       <h2>오늘 일정</h2>
       <!-- F-04 날씨를 받는 중 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
       <p class="weather-status" id="weather-status" role="status"></p>
+      <!-- F-07 기상특보 발표시각 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
+      <p class="weather-status" id="warning-status" role="status"></p>
       <table class="task-table">
         <thead>
           <tr>
@@ -33,7 +35,9 @@
             <th>담당</th>
             <!-- F-04: 오늘 최고 기온 · 최대 풍속 · 강수확률 -->
             <th>날씨</th>
-            <!-- F-04: R-01 ~ R-05 판단 결과 -->
+            <!-- F-07: 기상청 기상특보 (강풍주의보 등) -->
+            <th>특보</th>
+            <!-- F-04 · F-07: R-01 ~ R-06 판단 결과 -->
             <th>판단</th>
           </tr>
         </thead>

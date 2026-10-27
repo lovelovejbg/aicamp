@@ -55,14 +55,15 @@
     // 현재 날짜와 시간을 가진 Date 객체를 만듭니다
     const now = new Date();
 
-    // 한국어 형식으로 날짜를 바꿉니다
-    // 예: "2026년 10월 27일 화요일"
-    const todayText = now.toLocaleDateString("ko-KR", {
-      year: "numeric",   // 연도 (2026)
-      month: "long",     // 월 (10월)
-      day: "numeric",    // 일 (27)
-      weekday: "long",   // 요일 (화요일)
-    });
+    // 연, 월, 일을 각각 꺼냅니다 (사용자 컴퓨터의 현지 시간 기준)
+    const year = now.getFullYear();                              // 예: 2026
+    // getMonth()는 0부터 시작하므로(1월 = 0) 1을 더해야 합니다
+    // padStart(2, "0"): 한 자리 숫자 앞에 0을 붙여 두 자리로 만듭니다 (3 → "03")
+    const month = String(now.getMonth() + 1).padStart(2, "0");   // 예: "10"
+    const day = String(now.getDate()).padStart(2, "0");          // 예: "27"
+
+    // yyyy-mm-dd 형식으로 이어 붙입니다. 예: "2026-10-27"
+    const todayText = `${year}-${month}-${day}`;
 
     // id가 "today"인 문단을 찾아 날짜 문구를 넣습니다
     document.getElementById("today").textContent = todayText;

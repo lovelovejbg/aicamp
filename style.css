@@ -67,6 +67,45 @@ body {
   background: #f8fafc;
 }
 
+/* ===== F-04 날씨 상태 안내 ===== */
+.weather-status {
+  min-height: 1.2em;                 /* 비어 있어도 자리를 지켜 표가 들썩이지 않게 */
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.weather-status.is-error {
+  color: #dc2626;                    /* 실패 안내는 빨간 글씨 */
+}
+
+/* 지역 · 구분 · 담당 · 날씨 · 판단 칸은 짧은 글자라 줄바꿈하지 않음 (일정 이름 칸만 줄바꿈) */
+.task-table th:not(:first-child),
+.task-table td:not(:first-child) {
+  white-space: nowrap;
+}
+
+/* 날씨 칸 숫자는 살짝 연한 색 */
+.task-table td:nth-child(5) {
+  color: #475569;
+}
+
+/* ===== F-04 판단 배지 ===== */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;              /* 알약 모양 */
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-stop { background: #fee2e2; color: #b91c1c; } /* 중지 검토: 빨강 */
+.badge-heat { background: #ffedd5; color: #c2410c; } /* 폭염 휴식: 주황 */
+.badge-rain { background: #dbeafe; color: #1d4ed8; } /* 우천 주의: 파랑 */
+.badge-go   { background: #dcfce7; color: #15803d; } /* 진행: 초록 */
+.badge-none { background: #f1f5f9; color: #64748b; } /* 영향 없음 · 날씨 확인 전: 회색 */
+
 /* ===== F-02 일정 추가 폼 ===== */
 .task-form {
   display: flex;

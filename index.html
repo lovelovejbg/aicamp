@@ -22,6 +22,8 @@
     <!-- F-01 오늘 일정 목록 -->
     <section>
       <h2>오늘 일정</h2>
+      <!-- F-04 날씨를 받는 중 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
+      <p class="weather-status" id="weather-status" role="status"></p>
       <table class="task-table">
         <thead>
           <tr>
@@ -29,6 +31,10 @@
             <th>지역</th>
             <th>구분</th>
             <th>담당</th>
+            <!-- F-04: 오늘 최고 기온 · 최대 풍속 · 강수확률 -->
+            <th>날씨</th>
+            <!-- F-04: R-01 ~ R-05 판단 결과 -->
+            <th>판단</th>
           </tr>
         </thead>
         <!-- app.js 가 일정 데이터로 이 안의 행(tr)을 그립니다 -->

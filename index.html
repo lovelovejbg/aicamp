@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <!-- 한글이 깨지지 않도록 문자 인코딩을 UTF-8로 지정합니다 -->
+  <meta charset="UTF-8" />
+  <!-- 휴대폰에서도 화면 폭에 맞게 보이도록 설정합니다 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- 브라우저 탭에 표시되는 제목입니다 -->
+  <title>현장 일정 날씨판</title>
+
+  <style>
+    /* 페이지 전체 기본 스타일: 여백 제거, 글꼴, 배경색 */
+    body {
+      margin: 0;
+      min-height: 100vh;               /* 화면 높이 전체를 사용 */
+      display: flex;                   /* 내용물을 가운데 정렬하기 위해 flex 사용 */
+      align-items: center;             /* 세로 가운데 */
+      justify-content: center;         /* 가로 가운데 */
+      font-family: "Pretendard", "Malgun Gothic", sans-serif;
+      background: linear-gradient(135deg, #e0f2fe, #f0f9ff); /* 하늘색 계열 배경 */
+      color: #0f172a;
+    }
+
+    /* 제목과 날짜를 감싸는 카드 상자 */
+    .board {
+      text-align: center;
+      padding: 48px 64px;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1); /* 은은한 그림자 */
+    }
+
+    /* 메인 제목 */
+    .board h1 {
+      margin: 0 0 16px;
+      font-size: 2.5rem;
+    }
+
+    /* 오늘 날짜 문구 */
+    .board .today {
+      margin: 0;
+      font-size: 1.25rem;
+      color: #0369a1;
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <h1>현장 일정 날씨판</h1>
+    <!-- 이 자리에 자바스크립트가 오늘 날짜를 채워 넣습니다 -->
+    <p class="today" id="today"></p>
+  </main>
+
+  <script>
+    // 현재 날짜와 시간을 가진 Date 객체를 만듭니다
+    const now = new Date();
+
+    // 한국어 형식으로 날짜를 바꿉니다
+    // 예: "2026년 10월 27일 화요일"
+    const todayText = now.toLocaleDateString("ko-KR", {
+      year: "numeric",   // 연도 (2026)
+      month: "long",     // 월 (10월)
+      day: "numeric",    // 일 (27)
+      weekday: "long",   // 요일 (화요일)
+    });
+
+    // id가 "today"인 문단을 찾아 날짜 문구를 넣습니다
+    document.getElementById("today").textContent = todayText;
+  </script>
+</body>
+</html>

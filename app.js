@@ -2,85 +2,55 @@
 // 규칙(REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, parseWarnings, judgeTask 등)은
 // logic.js 에 있고, index.html 에서 먼저 불러옵니다.
 
-// 기본 일정 6건이 들어 있는 파일 (CLAUDE.md: 데이터는 data/ 폴더 JSON 에 둔다)
-const TASKS_FILE = "data/tasks.json";
+// ----- F-06 Supabase 연결 (표: wx_tasks) -----
+// 연결 정보(SUPABASE_URL · SUPABASE_KEY)는 config.js, supabase-js 는 index.html 에서 먼저 불러옵니다.
 
-// 브라우저 저장소(localStorage)에 '화면에서 추가한 일정만' 저장할 때 쓰는 이름표
-const ADDED_KEY = "wx_added_tasks";
+// 일정 표 이름과 화면에 필요한 칸
+const TASK_TABLE = "wx_tasks";
+const TASK_COLUMNS = "title, region, kind, owner";
 
-// 예전 버전이 '전체 목록'을 저장하던 이름표. 처음 한 번 추가 일정만 골라 옮긴 뒤 지웁니다.
-const OLD_STORAGE_KEY = "wx_tasks";
-
-// ----- 저장 / 불러오기 -----
-
-// data/tasks.json 을 읽어 기본 일정 목록을 돌려줍니다.
-// 더블클릭(file://)으로 열면 브라우저가 파일 읽기를 막아서 여기서 오류가 납니다.
-async function loadBaseTasks() {
-  const response = await fetch(TASKS_FILE);
-  if (!response.ok) throw new Error(`${TASKS_FILE} 응답 오류 (${response.status})`);
-  return parseTasks(await response.json());
-}
-
-// 브라우저에 저장된 '추가한 일정'을 불러옵니다. 없거나 망가져 있으면 빈 목록
-function loadAddedTasks() {
-  try {
-    return parseTasks(JSON.parse(localStorage.getItem(ADDED_KEY) ?? "[]"));
-  } catch (error) {
-    console.warn("저장된 추가 일정을 읽지 못했습니다.", error);
-    return [];
+// Supabase 연결 도구를 만듭니다. 준비가 안 됐으면 null 과 이유를 돌려줍니다.
+function createDb() {
+  if (typeof supabase === "undefined") {
+    return { db: null, reason: "Supabase 도구(supabase-js)를 불러오지 못했어요. 인터넷 연결을 확인해 주세요." };
   }
-}
-
-// 추가한 일정만 문자열(JSON)로 바꿔 브라우저에 저장합니다
-function saveAddedTasks(added) {
-  localStorage.setItem(ADDED_KEY, JSON.stringify(added));
-}
-
-// 예전 버전 저장값(기본 6건 + 추가 일정)에서 기본 일정을 빼고 추가 일정만 옮깁니다.
-function migrateOldStorage(baseTasks) {
-  const saved = localStorage.getItem(OLD_STORAGE_KEY);
-  if (saved === null) return;
-  try {
-    const sameTask = (a, b) =>
-      a.title === b.title && a.region === b.region && a.kind === b.kind && a.owner === b.owner;
-    const extra = parseTasks(JSON.parse(saved)).filter(
-      (task) => !baseTasks.some((base) => sameTask(base, task))
-    );
-    addedTasks = [...addedTasks, ...extra];
-    saveAddedTasks(addedTasks);
-  } catch (error) {
-    console.warn("예전 저장값을 옮기지 못했습니다.", error);
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return { db: null, reason: "config.js 에 Supabase 주소와 공개용 키를 넣어 주세요." };
   }
-  localStorage.removeItem(OLD_STORAGE_KEY);
+  return { db: supabase.createClient(SUPABASE_URL, SUPABASE_KEY), reason: "" };
 }
 
-// 화면에 보일 전체 목록 = JSON 기본 일정 + 브라우저에 저장된 추가 일정 (추가 일정은 맨 아래)
-function allTasks() {
-  return [...baseTasks, ...addedTasks];
+// 일정 목록 안내 문구 (task-status 자리)
+function showTaskStatus(text, isError) {
+  showStatus("task-status", text, isError);
 }
 
-// 일정 목록 안내 문구 (파일을 못 읽었을 때). 배포 주소는 눌러서 이동할 수 있게 링크로 만듭니다.
-function showTaskFileError() {
-  const status = document.getElementById("task-status");
-  status.replaceChildren();
-  status.classList.add("is-error");
-  status.append("일정 파일(data/tasks.json)을 읽지 못했어요. 배포 주소로 열어 주세요: ");
-  const link = document.createElement("a");
-  link.href = DEPLOYED_SITE;
-  link.textContent = DEPLOYED_SITE;
-  status.append(link);
-}
-
-// 기본 일정 파일을 읽어 표를 다시 그립니다. 실패하면 안내를 띄우고 추가 일정만 보여 줍니다.
+// wx_tasks 에서 일정을 순번(id) 순서로 읽어 표를 다시 그립니다.
+// 실패해도 날씨 · 특보는 따로 동작하고, 안내 문구만 띄웁니다.
 async function loadTasks() {
-  try {
-    baseTasks = await loadBaseTasks();
-    migrateOldStorage(baseTasks);
-  } catch (error) {
-    console.warn("일정 파일을 읽지 못했습니다.", error);
-    showTaskFileError();
+  if (!db) {
+    showTaskStatus(dbReason, true);
+    return;
   }
-  renderTasks(allTasks(), weather, warnings);
+  showTaskStatus("일정을 불러오는 중이에요…", false);
+  const { data, error } = await db.from(TASK_TABLE).select(TASK_COLUMNS).order("id");
+  if (error) {
+    console.warn("일정을 불러오지 못했습니다.", error);
+    showTaskStatus(`일정을 불러오지 못했어요. ${describeDbError(error)}`, true);
+    return;
+  }
+  // DB 에서 온 값도 logic.js 규칙으로 한 번 더 검사합니다
+  tasks = parseTasks(data);
+  renderTasks(tasks, weather, warnings);
+  showTaskStatus("", false);
+}
+
+// 일정 하나를 wx_tasks 에 저장합니다. 성공하면 저장된 일정을, 실패하면 오류를 던집니다.
+async function insertTask(task) {
+  if (!db) throw new Error(dbReason);
+  const { data, error } = await db.from(TASK_TABLE).insert(task).select(TASK_COLUMNS).single();
+  if (error) throw new Error(describeDbError(error));
+  return parseTasks([data])[0];
 }
 
 // ----- 화면 그리기 -----
@@ -204,7 +174,7 @@ async function loadWeather() {
 
     const data = await response.json();
     weather = applyTestMode(parseWeather(data), testMode);
-    renderTasks(allTasks(), weather, warnings);
+    renderTasks(tasks, weather, warnings);
 
     if (testMode === "wind") {
       showWeatherStatus(`시험 모드: 모든 지역 풍속을 ${TEST_WIND}m/s 로 바꿔 판단하고 있어요.`, false);
@@ -214,7 +184,7 @@ async function loadWeather() {
   } catch (error) {
     console.warn("날씨를 받지 못했습니다.", error);
     weather = null;               // 날씨로는 판단하지 않음 (특보 규칙만 적용)
-    renderTasks(allTasks(), weather, warnings);
+    renderTasks(tasks, weather, warnings);
     showWeatherStatus("날씨를 받지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.", true);
   }
 }
@@ -239,7 +209,7 @@ async function loadWarnings() {
     if (!response.ok || !data.ok) throw new Error(data.message || `특보 응답 오류 (${response.status})`);
 
     warnings = applyWarningTestMode(parseWarnings(data.t6), testMode);
-    renderTasks(allTasks(), weather, warnings);
+    renderTasks(tasks, weather, warnings);
 
     const time = formatTmFc(data.tmFc);
     if (testMode === "warn") {
@@ -251,7 +221,7 @@ async function loadWarnings() {
     console.warn("기상특보를 받지 못했습니다.", error);
     // ?test=warn 은 특보를 못 받아도 시험할 수 있게 빈 특보에서 시작
     warnings = testMode === "warn" ? applyWarningTestMode(null, testMode) : null;
-    renderTasks(allTasks(), weather, warnings);
+    renderTasks(tasks, weather, warnings);
     const suffix = testMode === "warn" ? " (시험 모드: 가짜 강풍주의보로 판단 중)" : "";
     showStatus("warning-status", `기상특보를 받지 못했어요.${suffix}`, true);
   }
@@ -259,11 +229,11 @@ async function loadWarnings() {
 
 // ----- 시작 -----
 
-// data/tasks.json 에서 읽은 기본 일정 (읽기 전이거나 실패하면 빈 목록)
-let baseTasks = [];
+// Supabase 연결 도구 (config.js 가 비었거나 supabase-js 를 못 불러오면 null, 이유는 dbReason)
+const { db, reason: dbReason } = createDb();
 
-// 화면에서 추가한 일정 (브라우저에 따로 저장됨)
-let addedTasks = loadAddedTasks();
+// Supabase wx_tasks 에서 읽은 일정 목록 (읽기 전이거나 실패하면 빈 목록)
+let tasks = [];
 
 // 받아 온 지역별 날씨 (받기 전이거나 실패하면 null → 판단은 '날씨 확인 전')
 let weather = null;
@@ -277,13 +247,12 @@ const message = document.getElementById("form-message");
 renderToday();
 fillOptions(form.elements.region, REGIONS);
 fillOptions(form.elements.kind, KINDS);
-renderTasks(allTasks(), weather, warnings); // 파일을 읽기 전에도 추가 일정은 바로 보여 줍니다
-loadTasks();     // data/tasks.json 을 읽으면 표를 다시 그립니다
+loadTasks();     // Supabase 에서 일정을 읽으면 표를 그립니다
 loadWeather();   // 날씨를 받으면 표를 다시 그립니다
 loadWarnings();  // 특보를 받으면 표를 다시 그립니다 (날씨와 동시에 따로 받음)
 
 // F-02 일정 추가: [추가] 버튼을 누르거나 입력칸에서 Enter 를 누르면 실행됩니다
-form.addEventListener("submit", (event) => {
+form.addEventListener("submit", async (event) => {
   event.preventDefault(); // 폼 기본 동작(페이지 새로고침)을 막습니다
 
   // 입력값을 모아 logic.js 의 규칙으로 검사합니다
@@ -299,9 +268,23 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  addedTasks.push(result.task);  // 목록 맨 아래에 추가
-  saveAddedTasks(addedTasks);    // 추가한 일정만 브라우저에 저장 (새로고침해도 남음)
-  renderTasks(allTasks(), weather, warnings); // 표 다시 그리기 (받아 둔 날씨 · 특보로 새 일정도 바로 판단)
+  // Supabase 에 저장하는 동안 버튼을 잠가 두 번 저장되지 않게 합니다
+  const button = form.querySelector("button");
+  button.disabled = true;
+  message.textContent = "저장하는 중이에요…";
+  let saved;
+  try {
+    saved = await insertTask(result.task);
+  } catch (error) {
+    console.warn("일정을 저장하지 못했습니다.", error);
+    message.textContent = `저장하지 못했어요. ${error.message}`;
+    return;
+  } finally {
+    button.disabled = false;
+  }
+
+  tasks.push(saved); // 목록 맨 아래에 추가 (DB 에 저장된 값 그대로)
+  renderTasks(tasks, weather, warnings); // 표 다시 그리기 (받아 둔 날씨 · 특보로 새 일정도 바로 판단)
 
   // 다음 입력을 위해 글자 칸만 비우고, 일정 칸에 커서를 둡니다
   message.textContent = "";

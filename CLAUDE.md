@@ -6,6 +6,7 @@
 
 ## 기술 스택 (변경 금지)
 - HTML + CSS + 순수 JavaScript만 사용한다. (React 등 프레임워크, 빌드 도구 사용 금지)
+- 외부 스크립트는 supabase-js(CDN) 하나만 쓴다.
 - index.html 을 더블클릭해서 열 수 있어야 한다.
 
 ## 폴더 구조
@@ -14,7 +15,8 @@
 - logic.js   : 판단 규칙만 (화면을 다루는 코드 금지)
 - app.js     : 화면 동작 (목록 그리기, 일정 추가)
 - api/       : Vercel 서버 함수 (인증키가 필요한 공공데이터 API 를 대신 호출). 순수 JavaScript, 빌드 도구 없음
-- data/      : 데이터 파일 (data/tasks.json : 기본 일정 목록)
+- config.js  : Supabase 연결 정보 두 줄만 (SUPABASE_URL · SUPABASE_KEY 공개용 키)
+- setup.sql  : Supabase 표 wx_tasks 만들기 · 값 규칙 · RLS 정책 · 가상 일정 6건 (SQL Editor 에서 직접 실행)
 - PRD.md · CLAUDE.md · README.md : 문서
 
 ## 작업 방식
@@ -24,8 +26,11 @@
 
 ## 보안 · 데이터 규칙
 - 가상 데이터만 사용한다. 실제 이름 · 연락처 · 기관 내부 자료를 넣지 않는다.
-- 데이터는 data/ 폴더 JSON 에 둔다. 코드(js) 안에 데이터 목록을 직접 적지 않는다.
-- 화면에서 추가한 일정만 브라우저(localStorage)에 따로 저장한다. 기본 일정은 data/tasks.json 이 기준이다.
+- 일정 데이터의 기준은 Supabase 표 wx_tasks 다. 읽기 · 추가 모두 이 표에서 한다.
+- 코드(js) · JSON 파일 · 브라우저(localStorage)에 일정 목록을 두지 않는다.
+- 표 구조 · 값 규칙 · 권한을 바꿀 때는 setup.sql 을 고치고, 화면 규칙(logic.js)과 DB 규칙(CHECK 제약)을 같게 맞춘다.
+- Supabase 는 공개용 키(anon · publishable)만 config.js 에 둔다. service_role · secret 키는 코드 · 채팅 · GitHub 어디에도 쓰지 않는다.
+- 공개용 키로는 RLS 정책에 따라 읽기 · 추가만 된다. 수정 · 삭제 정책은 만들지 않는다.
 - 사용자가 입력한 글자는 textContent 로 표시한다.
 - 비밀 키는 코드 · 채팅 · GitHub 에 넣지 않는다.
 - 공공데이터 인증키는 Vercel 환경변수(KMA_KEY)에만 두고, api/ 서버 함수에서만 읽는다. 응답에 키를 담지 않는다.

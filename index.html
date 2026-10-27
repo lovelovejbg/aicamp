@@ -22,7 +22,7 @@
     <!-- F-01 오늘 일정 목록 -->
     <section>
       <h2>오늘 일정</h2>
-      <!-- F-05 일정 파일(data/tasks.json)을 못 읽었을 때 안내가 나오는 자리 (app.js 가 채움) -->
+      <!-- F-06 Supabase 에서 일정을 불러오는 중 · 실패 안내가 나오는 자리 (app.js 가 채움) -->
       <p class="weather-status" id="task-status" role="status"></p>
       <!-- F-04 날씨를 받는 중 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
       <p class="weather-status" id="weather-status" role="status"></p>
@@ -82,9 +82,14 @@
 
   <!--
     스크립트 순서가 중요합니다.
-    logic.js(규칙)를 먼저 불러와야 app.js(화면)가 그 규칙을 쓸 수 있습니다.
+    1) supabase-js : Supabase 연결 도구 (외부 스크립트는 이것 하나만, 전역 이름 supabase)
+    2) config.js   : 연결 정보 두 줄 (주소 · 공개용 키)
+    3) logic.js    : 규칙
+    4) app.js      : 화면 동작 (위 셋을 모두 사용)
     type="module" 을 쓰지 않는 이유: 더블클릭(file://)으로 열면 모듈 스크립트가 막히기 때문입니다.
   -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="logic.js"></script>
   <script src="app.js"></script>
 </body>

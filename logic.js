@@ -37,7 +37,7 @@ function validateTask(input) {
   return { ok: true, task };
 }
 
-// 일정 배열(data/tasks.json 내용이나 브라우저에 저장된 값)을 검사해 올바른 일정만 돌려줍니다.
+// 일정 배열(Supabase wx_tasks 에서 읽은 행)을 검사해 올바른 일정만 돌려줍니다.
 // 배열이 아니면 오류를 던집니다. 규칙에 안 맞는 일정(빈칸 · 목록에 없는 지역 등)은 조용히 뺍니다.
 function parseTasks(data) {
   if (!Array.isArray(data)) throw new Error("일정 데이터가 배열이 아닙니다.");
@@ -45,6 +45,16 @@ function parseTasks(data) {
     .map((item) => validateTask(item ?? {}))
     .filter((result) => result.ok)
     .map((result) => result.task);
+}
+
+// Supabase(PostgreSQL) 오류를 사용자에게 보여 줄 안내 문구로 바꿉니다.
+// error: { code, message } (supabase-js 가 돌려주는 오류)
+function describeDbError(error) {
+  const code = error && error.code;
+  if (code === "23514") return "DB 규칙(지역 · 구분 · 글자 수)에 맞지 않는 값이에요.";
+  if (code === "42501") return "DB 권한이 없어요. setup.sql 의 RLS 정책을 실행했는지 확인해 주세요.";
+  if (code === "42P01" || code === "PGRST205") return "wx_tasks 표가 없어요. setup.sql 을 SQL Editor 에서 실행해 주세요.";
+  return (error && error.message) || "알 수 없는 오류예요.";
 }
 
 // ===================== F-04 날씨 · 판단 =====================

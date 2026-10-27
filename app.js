@@ -2,46 +2,85 @@
 // 규칙(REGIONS, KINDS, validateTask, buildWeatherUrl, parseWeather, parseWarnings, judgeTask 등)은
 // logic.js 에 있고, index.html 에서 먼저 불러옵니다.
 
-// 브라우저 저장소(localStorage)에 일정을 저장할 때 쓰는 이름표
-const STORAGE_KEY = "wx_tasks";
+// 기본 일정 6건이 들어 있는 파일 (CLAUDE.md: 데이터는 data/ 폴더 JSON 에 둔다)
+const TASKS_FILE = "data/tasks.json";
 
-// PRD 4장: 처음 보이는 가상 일정 6건 (실제 인물 · 기관 아님)
-const INITIAL_TASKS = [
-  { title: "다중이용시설 안전점검", region: "세종", kind: "야외", owner: "김안전" },
-  { title: "시민 안전체험 행사 운영", region: "보령", kind: "야외", owner: "이행사" },
-  { title: "옥상 태양광 설비 점검", region: "태안", kind: "고소", owner: "박설비" },
-  { title: "하천 수위계 확인", region: "대전", kind: "야외", owner: "최현장" },
-  { title: "청사 외벽 간판 보수", region: "세종", kind: "고소", owner: "정시설" },
-  { title: "비상연락 훈련", region: "대전", kind: "실내", owner: "한상황" },
-];
+// 브라우저 저장소(localStorage)에 '화면에서 추가한 일정만' 저장할 때 쓰는 이름표
+const ADDED_KEY = "wx_added_tasks";
+
+// 예전 버전이 '전체 목록'을 저장하던 이름표. 처음 한 번 추가 일정만 골라 옮긴 뒤 지웁니다.
+const OLD_STORAGE_KEY = "wx_tasks";
 
 // ----- 저장 / 불러오기 -----
 
-// 저장된 일정을 불러옵니다. 저장된 게 없거나 망가져 있으면 가상 6건을 씁니다.
-function loadTasks() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === null) {
-    // 처음 열었을 때: 원본이 바뀌지 않도록 복사본을 돌려줍니다
-    return INITIAL_TASKS.map((task) => ({ ...task }));
-  }
+// data/tasks.json 을 읽어 기본 일정 목록을 돌려줍니다.
+// 더블클릭(file://)으로 열면 브라우저가 파일 읽기를 막아서 여기서 오류가 납니다.
+async function loadBaseTasks() {
+  const response = await fetch(TASKS_FILE);
+  if (!response.ok) throw new Error(`${TASKS_FILE} 응답 오류 (${response.status})`);
+  return parseTasks(await response.json());
+}
+
+// 브라우저에 저장된 '추가한 일정'을 불러옵니다. 없거나 망가져 있으면 빈 목록
+function loadAddedTasks() {
   try {
-    const tasks = JSON.parse(saved);
-    // 배열이 아니면 망가진 데이터로 보고 처음 상태로 돌아갑니다
-    if (!Array.isArray(tasks)) throw new Error("일정 데이터가 배열이 아님");
-    // 규칙에 맞는 일정만 남깁니다 (손으로 고친 데이터 등 방어)
-    return tasks
-      .map((task) => validateTask(task))
-      .filter((result) => result.ok)
-      .map((result) => result.task);
+    return parseTasks(JSON.parse(localStorage.getItem(ADDED_KEY) ?? "[]"));
   } catch (error) {
-    console.warn("저장된 일정을 읽지 못해 처음 6건으로 시작합니다.", error);
-    return INITIAL_TASKS.map((task) => ({ ...task }));
+    console.warn("저장된 추가 일정을 읽지 못했습니다.", error);
+    return [];
   }
 }
 
-// 일정 배열을 문자열(JSON)로 바꿔 브라우저에 저장합니다
-function saveTasks(tasks) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+// 추가한 일정만 문자열(JSON)로 바꿔 브라우저에 저장합니다
+function saveAddedTasks(added) {
+  localStorage.setItem(ADDED_KEY, JSON.stringify(added));
+}
+
+// 예전 버전 저장값(기본 6건 + 추가 일정)에서 기본 일정을 빼고 추가 일정만 옮깁니다.
+function migrateOldStorage(baseTasks) {
+  const saved = localStorage.getItem(OLD_STORAGE_KEY);
+  if (saved === null) return;
+  try {
+    const sameTask = (a, b) =>
+      a.title === b.title && a.region === b.region && a.kind === b.kind && a.owner === b.owner;
+    const extra = parseTasks(JSON.parse(saved)).filter(
+      (task) => !baseTasks.some((base) => sameTask(base, task))
+    );
+    addedTasks = [...addedTasks, ...extra];
+    saveAddedTasks(addedTasks);
+  } catch (error) {
+    console.warn("예전 저장값을 옮기지 못했습니다.", error);
+  }
+  localStorage.removeItem(OLD_STORAGE_KEY);
+}
+
+// 화면에 보일 전체 목록 = JSON 기본 일정 + 브라우저에 저장된 추가 일정 (추가 일정은 맨 아래)
+function allTasks() {
+  return [...baseTasks, ...addedTasks];
+}
+
+// 일정 목록 안내 문구 (파일을 못 읽었을 때). 배포 주소는 눌러서 이동할 수 있게 링크로 만듭니다.
+function showTaskFileError() {
+  const status = document.getElementById("task-status");
+  status.replaceChildren();
+  status.classList.add("is-error");
+  status.append("일정 파일(data/tasks.json)을 읽지 못했어요. 배포 주소로 열어 주세요: ");
+  const link = document.createElement("a");
+  link.href = DEPLOYED_SITE;
+  link.textContent = DEPLOYED_SITE;
+  status.append(link);
+}
+
+// 기본 일정 파일을 읽어 표를 다시 그립니다. 실패하면 안내를 띄우고 추가 일정만 보여 줍니다.
+async function loadTasks() {
+  try {
+    baseTasks = await loadBaseTasks();
+    migrateOldStorage(baseTasks);
+  } catch (error) {
+    console.warn("일정 파일을 읽지 못했습니다.", error);
+    showTaskFileError();
+  }
+  renderTasks(allTasks(), weather, warnings);
 }
 
 // ----- 화면 그리기 -----
@@ -165,7 +204,7 @@ async function loadWeather() {
 
     const data = await response.json();
     weather = applyTestMode(parseWeather(data), testMode);
-    renderTasks(tasks, weather, warnings);
+    renderTasks(allTasks(), weather, warnings);
 
     if (testMode === "wind") {
       showWeatherStatus(`시험 모드: 모든 지역 풍속을 ${TEST_WIND}m/s 로 바꿔 판단하고 있어요.`, false);
@@ -175,7 +214,7 @@ async function loadWeather() {
   } catch (error) {
     console.warn("날씨를 받지 못했습니다.", error);
     weather = null;               // 날씨로는 판단하지 않음 (특보 규칙만 적용)
-    renderTasks(tasks, weather, warnings);
+    renderTasks(allTasks(), weather, warnings);
     showWeatherStatus("날씨를 받지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.", true);
   }
 }
@@ -200,7 +239,7 @@ async function loadWarnings() {
     if (!response.ok || !data.ok) throw new Error(data.message || `특보 응답 오류 (${response.status})`);
 
     warnings = applyWarningTestMode(parseWarnings(data.t6), testMode);
-    renderTasks(tasks, weather, warnings);
+    renderTasks(allTasks(), weather, warnings);
 
     const time = formatTmFc(data.tmFc);
     if (testMode === "warn") {
@@ -212,7 +251,7 @@ async function loadWarnings() {
     console.warn("기상특보를 받지 못했습니다.", error);
     // ?test=warn 은 특보를 못 받아도 시험할 수 있게 빈 특보에서 시작
     warnings = testMode === "warn" ? applyWarningTestMode(null, testMode) : null;
-    renderTasks(tasks, weather, warnings);
+    renderTasks(allTasks(), weather, warnings);
     const suffix = testMode === "warn" ? " (시험 모드: 가짜 강풍주의보로 판단 중)" : "";
     showStatus("warning-status", `기상특보를 받지 못했어요.${suffix}`, true);
   }
@@ -220,8 +259,11 @@ async function loadWarnings() {
 
 // ----- 시작 -----
 
-// 현재 화면에 보이는 일정 목록 (추가할 때마다 이 배열에 붙입니다)
-let tasks = loadTasks();
+// data/tasks.json 에서 읽은 기본 일정 (읽기 전이거나 실패하면 빈 목록)
+let baseTasks = [];
+
+// 화면에서 추가한 일정 (브라우저에 따로 저장됨)
+let addedTasks = loadAddedTasks();
 
 // 받아 온 지역별 날씨 (받기 전이거나 실패하면 null → 판단은 '날씨 확인 전')
 let weather = null;
@@ -235,7 +277,8 @@ const message = document.getElementById("form-message");
 renderToday();
 fillOptions(form.elements.region, REGIONS);
 fillOptions(form.elements.kind, KINDS);
-renderTasks(tasks, weather, warnings); // 날씨 · 특보 없이 목록부터 먼저 보여 줍니다
+renderTasks(allTasks(), weather, warnings); // 파일을 읽기 전에도 추가 일정은 바로 보여 줍니다
+loadTasks();     // data/tasks.json 을 읽으면 표를 다시 그립니다
 loadWeather();   // 날씨를 받으면 표를 다시 그립니다
 loadWarnings();  // 특보를 받으면 표를 다시 그립니다 (날씨와 동시에 따로 받음)
 
@@ -256,9 +299,9 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  tasks.push(result.task); // 목록 맨 아래에 추가
-  saveTasks(tasks);        // 새로고침해도 남도록 저장
-  renderTasks(tasks, weather, warnings); // 표 다시 그리기 (받아 둔 날씨 · 특보로 새 일정도 바로 판단)
+  addedTasks.push(result.task);  // 목록 맨 아래에 추가
+  saveAddedTasks(addedTasks);    // 추가한 일정만 브라우저에 저장 (새로고침해도 남음)
+  renderTasks(allTasks(), weather, warnings); // 표 다시 그리기 (받아 둔 날씨 · 특보로 새 일정도 바로 판단)
 
   // 다음 입력을 위해 글자 칸만 비우고, 일정 칸에 커서를 둡니다
   message.textContent = "";

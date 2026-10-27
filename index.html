@@ -22,10 +22,14 @@
     <!-- F-01 오늘 일정 목록 -->
     <section>
       <h2>오늘 일정</h2>
+      <!-- F-05 일정 파일(data/tasks.json)을 못 읽었을 때 안내가 나오는 자리 (app.js 가 채움) -->
+      <p class="weather-status" id="task-status" role="status"></p>
       <!-- F-04 날씨를 받는 중 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
       <p class="weather-status" id="weather-status" role="status"></p>
       <!-- F-07 기상특보 발표시각 · 실패 · 시험 모드 안내가 나오는 자리 (app.js 가 채움) -->
       <p class="weather-status" id="warning-status" role="status"></p>
+      <!-- 좁은 화면에서는 표만 좌우로 스크롤되게 감싸는 상자 -->
+      <div class="table-wrap">
       <table class="task-table">
         <thead>
           <tr>
@@ -44,6 +48,7 @@
         <!-- app.js 가 일정 데이터로 이 안의 행(tr)을 그립니다 -->
         <tbody id="task-list"></tbody>
       </table>
+      </div>
     </section>
 
     <!-- F-02 일정 추가 -->

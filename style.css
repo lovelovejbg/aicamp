@@ -13,7 +13,7 @@ body {
 .board {
   max-width: 1000px;                 /* 너무 넓어지지 않게 최대 폭 제한 */
   margin: 0 auto;                    /* 가로 가운데 정렬 */
-  padding: 40px 48px;
+  padding: 40px 32px;
   background: #ffffff;
   border-radius: 20px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1); /* 은은한 그림자 */
@@ -44,6 +44,11 @@ body {
 }
 
 /* ===== F-01 일정 표 ===== */
+/* 표가 카드보다 넓어지면 페이지 전체가 아니라 표만 좌우로 스크롤 */
+.table-wrap {
+  overflow-x: auto;
+}
+
 .task-table {
   width: 100%;
   border-collapse: collapse;         /* 칸 사이 테두리를 한 줄로 합침 */
@@ -51,7 +56,7 @@ body {
 
 .task-table th,
 .task-table td {
-  padding: 10px 12px;
+  padding: 10px 8px;                 /* 칸이 7개라 좌우 여백을 좁게 */
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
 }

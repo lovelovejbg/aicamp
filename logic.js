@@ -37,6 +37,16 @@ function validateTask(input) {
   return { ok: true, task };
 }
 
+// 일정 배열(data/tasks.json 내용이나 브라우저에 저장된 값)을 검사해 올바른 일정만 돌려줍니다.
+// 배열이 아니면 오류를 던집니다. 규칙에 안 맞는 일정(빈칸 · 목록에 없는 지역 등)은 조용히 뺍니다.
+function parseTasks(data) {
+  if (!Array.isArray(data)) throw new Error("일정 데이터가 배열이 아닙니다.");
+  return data
+    .map((item) => validateTask(item ?? {}))
+    .filter((result) => result.ok)
+    .map((result) => result.task);
+}
+
 // ===================== F-04 날씨 · 판단 =====================
 
 // 지역별 좌표 (위도, 경도). REGIONS 에 지역을 추가하면 여기도 함께 추가해야 합니다.

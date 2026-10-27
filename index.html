@@ -7,66 +7,70 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- 브라우저 탭에 표시되는 제목입니다 -->
   <title>현장 일정 날씨판</title>
-
-  <style>
-    /* 페이지 전체 기본 스타일: 여백 제거, 글꼴, 배경색 */
-    body {
-      margin: 0;
-      min-height: 100vh;               /* 화면 높이 전체를 사용 */
-      display: flex;                   /* 내용물을 가운데 정렬하기 위해 flex 사용 */
-      align-items: center;             /* 세로 가운데 */
-      justify-content: center;         /* 가로 가운데 */
-      font-family: "Pretendard", "Malgun Gothic", sans-serif;
-      background: linear-gradient(135deg, #e0f2fe, #f0f9ff); /* 하늘색 계열 배경 */
-      color: #0f172a;
-    }
-
-    /* 제목과 날짜를 감싸는 카드 상자 */
-    .board {
-      text-align: center;
-      padding: 48px 64px;
-      background: #ffffff;
-      border-radius: 20px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1); /* 은은한 그림자 */
-    }
-
-    /* 메인 제목 */
-    .board h1 {
-      margin: 0 0 16px;
-      font-size: 2.5rem;
-    }
-
-    /* 오늘 날짜 문구 */
-    .board .today {
-      margin: 0;
-      font-size: 1.25rem;
-      color: #0369a1;
-    }
-  </style>
+  <!-- 디자인은 style.css 에서 불러옵니다 -->
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="board">
-    <h1>현장 일정 날씨판</h1>
-    <!-- 이 자리에 자바스크립트가 오늘 날짜를 채워 넣습니다 -->
-    <p class="today" id="today"></p>
+    <!-- 머리말: 제목 + 오늘 날짜 -->
+    <header class="board-header">
+      <h1>현장 일정 날씨판</h1>
+      <!-- app.js 가 이 자리에 오늘 날짜(yyyy-mm-dd)를 채워 넣습니다 -->
+      <p class="today" id="today"></p>
+    </header>
+
+    <!-- F-01 오늘 일정 목록 -->
+    <section>
+      <h2>오늘 일정</h2>
+      <table class="task-table">
+        <thead>
+          <tr>
+            <th>일정</th>
+            <th>지역</th>
+            <th>구분</th>
+            <th>담당</th>
+          </tr>
+        </thead>
+        <!-- app.js 가 일정 데이터로 이 안의 행(tr)을 그립니다 -->
+        <tbody id="task-list"></tbody>
+      </table>
+    </section>
+
+    <!-- F-02 일정 추가 -->
+    <section>
+      <h2>일정 추가</h2>
+      <form id="task-form" class="task-form">
+        <label>
+          일정
+          <input type="text" name="title" placeholder="예: 공원 놀이시설 점검" maxlength="50" />
+        </label>
+        <label>
+          지역
+          <!-- 선택지(세종 · 대전 · 태안 · 보령)는 app.js 가 logic.js 의 목록으로 채웁니다 -->
+          <select name="region"></select>
+        </label>
+        <label>
+          구분
+          <!-- 선택지(야외 · 고소 · 실내)도 app.js 가 채웁니다 -->
+          <select name="kind"></select>
+        </label>
+        <label>
+          담당
+          <input type="text" name="owner" placeholder="예: 홍길동" maxlength="20" />
+        </label>
+        <button type="submit">추가</button>
+      </form>
+      <!-- 입력이 잘못됐을 때 안내 문구가 나오는 자리 -->
+      <p class="form-message" id="form-message" role="alert"></p>
+    </section>
   </main>
 
-  <script>
-    // 현재 날짜와 시간을 가진 Date 객체를 만듭니다
-    const now = new Date();
-
-    // 연, 월, 일을 각각 꺼냅니다 (사용자 컴퓨터의 현지 시간 기준)
-    const year = now.getFullYear();                              // 예: 2026
-    // getMonth()는 0부터 시작하므로(1월 = 0) 1을 더해야 합니다
-    // padStart(2, "0"): 한 자리 숫자 앞에 0을 붙여 두 자리로 만듭니다 (3 → "03")
-    const month = String(now.getMonth() + 1).padStart(2, "0");   // 예: "10"
-    const day = String(now.getDate()).padStart(2, "0");          // 예: "27"
-
-    // yyyy-mm-dd 형식으로 이어 붙입니다. 예: "2026-10-27"
-    const todayText = `${year}-${month}-${day}`;
-
-    // id가 "today"인 문단을 찾아 날짜 문구를 넣습니다
-    document.getElementById("today").textContent = todayText;
-  </script>
+  <!--
+    스크립트 순서가 중요합니다.
+    logic.js(규칙)를 먼저 불러와야 app.js(화면)가 그 규칙을 쓸 수 있습니다.
+    type="module" 을 쓰지 않는 이유: 더블클릭(file://)으로 열면 모듈 스크립트가 막히기 때문입니다.
+  -->
+  <script src="logic.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
